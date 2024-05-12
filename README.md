@@ -4,7 +4,7 @@ se você gostou ou encontrou algum problema ou erro ou tem alguma duvida,mande n
 
 Origin of the name Erandom.hpp
 Erandom is basically the combination of the initial of my name (Ebert) + the first namespace created in it (Random)
-And I used this as a base, for example Euutil, Emath Etweens and so on, apart from the fact that this lib that I made alone is openSource, as long as you follow the license (I used the Apache 2.0 license) everything is fine,
+And I used this as a base, for example Euutil, Emath Etweens and so on, apart from the fact that this lib that I made alone is openSource, as long as you follow the license (I used the Apache 2.0 license here[https://www.apache.org/licenses/LICENSE-2.0.txt]) everything is fine,
 I hope you enjoy!
 
 Origem do nome Erandom.hpp
