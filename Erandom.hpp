@@ -1,5 +1,8 @@
+#include <GL/freeglut_std.h>
+#include <GL/gl.h>
 #include <SFML/Audio/Music.hpp>
 #include <SFML/Audio/SoundSource.hpp>
+#include <SFML/Graphics/Color.hpp>
 #include <SFML/Graphics/Font.hpp>
 #include <SFML/Graphics/Image.hpp>
 #include <SFML/Graphics/RectangleShape.hpp>
@@ -12,12 +15,16 @@
 #include <SFML/Window/Clipboard.hpp>
 #include <SFML/Window/ContextSettings.hpp>
 #include <SFML/Window/Event.hpp>
+#include <SFML/Window/Keyboard.hpp>
 #include <SFML/Window/Mouse.hpp>
 #include <SFML/Window/VideoMode.hpp>
 #include <SFML/Window/WindowStyle.hpp>
+#include <chrono>
 #include <iostream>
 #include <random>
 #include <string>
+#include <SFML/OpenGL.hpp>
+#include <type_traits>
 #include <vector>
 #include <map>
 #include <sstream>
@@ -26,6 +33,8 @@
 #include <Erandom_cortesia.hpp> //aqui tem a váriavel data contendo o hex/bin da fonte arial black e o icone padrão
 #include <SFML/Graphics.hpp>
 #include <SFML/Audio.hpp>
+#include <GL/gl.h>
+#include <dlfcn.h>
 //
 //Esse hpp é o Erandom.hpp
 //
@@ -411,12 +420,68 @@ namespace Esfml /*Após meses,finalmente decide fazelo*/ {
     bool mouseClickedRect(sf::RectangleShape rect, sf::Vector2i mouse) {
         return rect.getGlobalBounds().contains(mouse.x, mouse.y);
     }
+    bool checkCollision(const sf::RectangleShape& shape1, const sf::RectangleShape& shape2) {
+        return shape1.getGlobalBounds().intersects(shape2.getGlobalBounds());
+    }
+    template<typename Classe>
+    inline void shine(Classe obj, uint inc) {
+        obj.getFillColor().toInteger();
+        obj.setFillColor(sf::Color(obj.getFillColor().r + inc, obj.getFillColor().g + inc, obj.getFillColor().b + inc, obj.getFillColor().a + inc));
+
+    }
+    namespace EopenGL {
+        class Cube {
+        private:
+            GLfloat colors[6][3] = {
+                {1.0, 0.0, 0.0}, // Vermelho
+                {0.0, 1.0, 0.0}, // Verde
+                {0.0, 0.0, 1.0}, // Azul
+                {1.0, 1.0, 0.0}, // Amarelo
+                {1.0, 0.0, 1.0}, // Magenta
+                {0.0, 1.0, 1.0}  // Ciano
+            };
+
+            GLfloat vertices[8][3] = {
+                {-1.0, -1.0, 1.0},
+                {1.0, -1.0, 1.0},
+                {1.0, 1.0, 1.0},
+                {-1.0, 1.0, 1.0},
+                {-1.0, -1.0, -1.0},
+                {-1.0, 1.0, -1.0},
+                {1.0, 1.0, -1.0},
+                {1.0, -1.0, -1.0}
+            };
+
+            GLubyte indices[6][4] = {
+                {0, 1, 2, 3},
+                {3, 2, 6, 7},
+                {7, 6, 5, 4},
+                {4, 5, 1, 0},
+                {5, 6, 2, 1},
+                {7, 4, 0, 3}
+            };
+        public:
+            /// @note Use glutSwapBuffers após o uso
+            void draw() {
+                for (int i = 0; i < 6; ++i) {
+                    glBegin(GL_QUADS);
+                    glColor3fv(colors[i]);
+                    for (int j = 0; j < 4; ++j) {
+                        glVertex3fv(vertices[indices[i][j]]);
+                    }
+                    glEnd();
+                }
+            }
+        };
+    }
+
 }
 class EbetterSfml {
 public:
     sf::Clock deltaTime;
     sf::Clipboard clipboard;
     sf::Music audio;
+    sf::Keyboard teclado;
     float Volume = 50;
     sf::RenderWindow window; // Membro para armazenar a janela
     enum Errors {
@@ -443,15 +508,18 @@ public:
     }
 
     // Função para iniciar o programa
-    void init() {
+    void init(int *parg, char ** argv) {
         start();
         while (window.isOpen()) {
             sf::Event event;
             while (window.pollEvent(event)) {
                 on_event(event);
             }
+            change();
+            openGL_display();
             update();
         }
+        clean();
     }
 
     // Função para iniciar o programa
@@ -460,8 +528,11 @@ public:
         std::cout << "Programa iniciado!\n";
         EWHITE;
     }
-
-    // Função para atualizar a lógica do jogo
+    // Função para melhor organiza mudanças durante o runtime
+    virtual void change() {
+        window.setSize({window.getSize().x, window.getSize().y});
+    }
+    // Função para atualizar a lógica
     virtual void update() {
         window.clear();
         window.display();
@@ -473,7 +544,12 @@ public:
             window.close();
         }
     }
-
+    virtual void openGL_display() {
+        std::cout << "\n";
+    }
+    virtual void clean() {
+        std::cout << "Cache,Memoria alocado e etc Limpados com sucesso!";
+    }
     // Função para manipular áudio
     Errors music(std::string audioName, Actions action) {
         if (action == Actions::Play) {
@@ -495,3 +571,30 @@ public:
         return Errors::None;
     }
 };
+namespace Ebinaries {
+    template<typename ReturnType>
+    inline ReturnType (*getFuncFromDll(const char* libPath, const char* funcName))() {
+        void* handle = dlopen(libPath, RTLD_LAZY);
+        
+        if (!handle) {
+            std::cerr << "Erro ao carregar a biblioteca: " << dlerror() << std::endl;
+            return nullptr;
+        }
+
+        // Obtém o ponteiro para a função desejada
+        typedef ReturnType (*FuncPtr)();
+        FuncPtr func = (FuncPtr)dlsym(handle, funcName);
+
+        if (!func) {
+            std::cerr << "Erro ao obter o ponteiro para a função: " << dlerror() << std::endl;
+            dlclose(handle);
+            return nullptr;
+        }
+
+        // Fecha a biblioteca
+        dlclose(handle);
+
+        return func;
+    }
+
+}
